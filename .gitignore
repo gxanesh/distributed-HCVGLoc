@@ -25,6 +25,9 @@ wandb/
 # Data
 data/
 datasets/
+docs/
+results/
+logs/
 
 # IDE
 .vscode/
@@ -33,3 +36,5 @@ datasets/
 # OS
 .DS_Store
 Thumbs.db
+
+README.md
