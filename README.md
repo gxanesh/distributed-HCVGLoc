@@ -9,12 +9,12 @@
 ## Overview
 
 This repository implements and rigorously evaluates the **distributed PyTorch DDP training
-pipeline** for **Stage 1 (Coarse Retrieval)** of the HCVGLoc framework — a
+pipeline** for Coarse Retrieval Stage of the HCVGLoc framework — a
 hierarchical cross-view geo-localization system for GPS-denied UAV navigation.
 
 The project treats the 4× NVIDIA RTX Ada 6000 training cluster as a distributed system:
 
-| Pillar | What is Measured |
+| Metrics | What is Measured |
 |--------|----------------|
 | **Scalability** | Throughput (img/s), speedup, parallel efficiency across 1/2/4 GPUs |
 | **Communication Overhead** | AllReduce latency, compute-to-comm ratio, bandwidth sensitivity |
