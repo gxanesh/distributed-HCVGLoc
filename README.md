@@ -14,7 +14,7 @@ hierarchical cross-view geo-localization system for GPS-denied UAV navigation.
 
 The project treats the 4× NVIDIA RTX Ada 6000 training cluster as a distributed system:
 
-| Pillar | What We Measure |
+| Pillar | What is Measured |
 |--------|----------------|
 | **Scalability** | Throughput (img/s), speedup, parallel efficiency across 1/2/4 GPUs |
 | **Communication Overhead** | AllReduce latency, compute-to-comm ratio, bandwidth sensitivity |
