@@ -3,8 +3,6 @@
 **Distributed Training Infrastructure for Hierarchical Cross-View Geo-Localization**
 
 > Graduate Distributed Systems Course Project · Missouri S&T · Spring 2026  
-> Researcher: Ganesh (gs37r) · Advisor: Dr. Sanjay Madria  
-> Funded by: Army Research Laboratory
 
 ---
 
