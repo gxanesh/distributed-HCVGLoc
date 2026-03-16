@@ -2,7 +2,7 @@
 
 **Distributed Training Infrastructure for Hierarchical Cross-View Geo-Localization**
 
-> Graduate Distributed Systems Course Project · Missouri S&T · Spring 2026  
+> Distributed Systems Theory and Analysis Course Project · Missouri S&T · Spring 2026  
 
 ---
 
