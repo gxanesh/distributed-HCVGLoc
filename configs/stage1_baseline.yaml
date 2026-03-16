@@ -1,0 +1,54 @@
+# stage1_baseline.yaml
+# Single GPU baseline — identical hyperparams to DDP run for fair comparison
+
+exp_name: "stage1_1gpu_baseline"
+output_dir: "experiments/stage1_baseline"
+
+model:
+  descriptor_dim: 512
+  fpn_out_ch: 256
+  num_fpn_layers: 3
+  num_slots: 8
+  num_domains: 4
+
+training:
+  epochs: 100
+  batch_size: 32          # same per-GPU batch as DDP configs
+  val_batch_size: 128
+  num_workers: 8
+
+  optimizer: adamw
+  lr: 3.0e-4
+  backbone_lr_scale: 0.1
+  weight_decay: 0.05
+  grad_clip: 1.0
+
+  scheduler: cosine
+  min_lr: 1.0e-6
+
+  grl_warmup_epochs: 20
+  grl_lambda_max: 0.1
+
+  use_amp: true
+  val_interval: 5
+  log_interval: 50
+  seed: 42
+
+losses:
+  temperature: 0.07
+  lambda_nce: 1.0
+  lambda_js: 0.5
+  lambda_domain: 0.1
+  lambda_rot: 0.2
+  lambda_unc: 0.1
+
+data:
+  train_datasets: [cvusa, vigor]
+  val_datasets: [cvact, vigor]
+  cvusa_root: "/media/8TB-1/gs37r/research/datasets/CVUSA"
+  vigor_root: "/media/8TB-1/gs37r/research/datasets/VIGOR"
+  cvact_root: "/media/8TB-1/gs37r/research/datasets/CVACT"
+
+logging:
+  use_wandb: false
+  use_tensorboard: true

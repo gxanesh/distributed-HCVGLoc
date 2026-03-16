@@ -1,0 +1,65 @@
+# stage1_ddp_4gpu.yaml
+# HCVGLoc Stage 1 — 4x NVIDIA RTX Ada 6000 (primary training config)
+
+exp_name: "stage1_ddp_4gpu"
+output_dir: "experiments/stage1_ddp_4gpu"
+
+model:
+  descriptor_dim: 512
+  fpn_out_ch: 256
+  num_fpn_layers: 3
+  num_slots: 8
+  num_domains: 4
+
+training:
+  epochs: 100
+  batch_size: 32          # per-GPU → global batch = 32 × 4 = 128
+  val_batch_size: 128
+  num_workers: 8
+
+  # Optimizer
+  optimizer: adamw
+  lr: 3.0e-4
+  backbone_lr_scale: 0.1  # backbone gets lr × 0.1 = 3e-5
+  weight_decay: 0.05
+  grad_clip: 1.0
+
+  # Scheduler: cosine annealing
+  scheduler: cosine
+  min_lr: 1.0e-6
+
+  # GRL lambda scheduling
+  grl_warmup_epochs: 20
+  grl_lambda_max: 0.1
+
+  # Mixed precision
+  use_amp: true
+
+  # Validation
+  val_interval: 5
+
+  # Logging
+  log_interval: 50
+
+  seed: 42
+
+losses:
+  temperature: 0.07       # InfoNCE temperature (fixed from τ=0.02 overfitting)
+  lambda_nce: 1.0
+  lambda_js: 0.5
+  lambda_domain: 0.1
+  lambda_rot: 0.2
+  lambda_unc: 0.1
+
+data:
+  train_datasets: [cvusa, vigor]
+  val_datasets: [cvact, vigor]
+
+  # Update these paths to match your workstation
+  cvusa_root: "/media/8TB-1/gs37r/research/datasets/CVUSA"
+  vigor_root: "/media/8TB-1/gs37r/research/datasets/VIGOR"
+  cvact_root: "/media/8TB-1/gs37r/research/datasets/CVACT"
+
+logging:
+  use_wandb: false
+  use_tensorboard: true
