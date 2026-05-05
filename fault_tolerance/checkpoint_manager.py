@@ -299,14 +299,57 @@ def parse_args():
     p.add_argument("--restore", type=str, default=None,
                    help="Path to checkpoint to restore (for testing recovery)")
     p.add_argument("--output_dir", type=str, default="results")
+    p.add_argument("--wandb", action="store_true",
+                   help="Log overhead benchmark summary to wandb.")
+    p.add_argument("--wandb_project", type=str, default="hcvgloc-distributed")
+    p.add_argument("--wandb_entity", type=str, default="w2c-lab")
+    p.add_argument("--wandb_group", type=str, default="checkpoint_overhead")
     return p.parse_args()
+
+
+def _log_checkpoint_wandb(args, results, json_path: Path, plot_path: Path):
+    try:
+        import wandb
+    except ImportError:
+        print("[wandb] not installed; skipping.")
+        return
+
+    wandb.init(
+        project=args.wandb_project,
+        entity=args.wandb_entity,
+        group=args.wandb_group,
+        name="checkpoint_overhead",
+        config={"intervals": args.intervals},
+        reinit=True,
+    )
+    cols = list(results[0].keys())
+    table = wandb.Table(columns=cols)
+    for r in results:
+        table.add_data(*[r.get(c) for c in cols])
+        wandb.log(
+            {f"ckpt/{k}": v for k, v in r.items() if isinstance(v, (int, float))},
+            step=r["interval_epochs"],
+        )
+    wandb.log({"checkpoint_overhead_table": table})
+    if plot_path.exists():
+        wandb.log({"checkpoint_tradeoff_plot": wandb.Image(str(plot_path))})
+    wandb.save(str(json_path))
+    wandb.finish()
+    print("[wandb] checkpoint benchmark synced")
 
 
 if __name__ == "__main__":
     args = parse_args()
 
     if args.benchmark:
-        benchmark_checkpoint_overhead(args)
+        results = benchmark_checkpoint_overhead(args)
+        if args.wandb:
+            out = Path(args.output_dir)
+            _log_checkpoint_wandb(
+                args, results,
+                out / "tables" / "checkpoint_overhead.json",
+                out / "plots" / "checkpoint_tradeoff.png",
+            )
     elif args.restore:
         from benchmarks.communication_profiler import ProxyStage1
         model = ProxyStage1()

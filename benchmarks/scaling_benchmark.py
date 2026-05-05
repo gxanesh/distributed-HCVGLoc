@@ -46,6 +46,11 @@ def parse_args():
                    help="Max steps per epoch (use subset for speed)")
     p.add_argument("--config", type=str, default="configs/stage1_ddp_4gpu.yaml")
     p.add_argument("--output_dir", type=str, default="results")
+    p.add_argument("--wandb", action="store_true",
+                   help="Log benchmark summary to wandb (project=hcvgloc-distributed).")
+    p.add_argument("--wandb_project", type=str, default="hcvgloc-distributed")
+    p.add_argument("--wandb_entity", type=str, default="w2c-lab")
+    p.add_argument("--wandb_group", type=str, default="scaling_benchmark")
     return p.parse_args()
 
 
@@ -223,6 +228,42 @@ def main():
 
     # Plot
     plot_scaling(results, out)
+
+    # Optional wandb logging
+    if args.wandb:
+        try:
+            import wandb
+            wandb.init(
+                project=args.wandb_project,
+                entity=args.wandb_entity,
+                group=args.wandb_group,
+                name=f"scaling_{'_'.join(str(g) for g in sorted(args.gpus))}GPU",
+                config={
+                    "gpus_tested": sorted(args.gpus),
+                    "epochs": args.epochs,
+                    "batch_size_per_gpu": args.batch_size,
+                    "steps_per_epoch": args.steps_per_epoch,
+                },
+                reinit=True,
+            )
+            cols = list(results[0].keys())
+            table = wandb.Table(columns=cols)
+            for r in results:
+                table.add_data(*[r.get(c) for c in cols])
+                wandb.log(
+                    {f"scaling/{k}": v for k, v in r.items() if isinstance(v, (int, float))},
+                    step=r["num_gpus"],
+                )
+            wandb.log({"scaling_table": table})
+            plot_path = out / "plots" / "scaling_results.png"
+            if plot_path.exists():
+                wandb.log({"scaling_plot": wandb.Image(str(plot_path))})
+            wandb.save(str(table_path))
+            wandb.finish()
+            print("[wandb] scaling benchmark synced")
+        except ImportError:
+            print("[wandb] not installed; skipping.")
+
     print("\n[Scaling benchmark complete]")
 
 

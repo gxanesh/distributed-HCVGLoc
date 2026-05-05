@@ -11,6 +11,8 @@ build/
 .venv/
 env/
 venv/
+CLAUDE.md
+.claude/
 
 # Jupyter
 .ipynb_checkpoints/

@@ -1,0 +1,62 @@
+# stage1_univ1652_4gpu.yaml
+# HCVGLoc Stage 1 — 4x NVIDIA RTX Ada 6000, University-1652 only
+# Primary DDP training config for the Spring 2026 distributed-systems progress report.
+
+exp_name: "stage1_univ1652_4gpu"
+output_dir: "experiments/stage1_univ1652_4gpu"
+
+model:
+  descriptor_dim: 512
+  fpn_out_ch: 256
+  num_fpn_layers: 3
+  num_slots: 8
+  num_domains: 4
+
+training:
+  # Short-horizon run for the progress report; bump for the final run.
+  epochs: 5
+  batch_size: 32          # per-GPU → global batch = 32 × 4 = 128
+  val_batch_size: 128
+  num_workers: 8
+
+  optimizer: adamw
+  lr: 3.0e-4
+  backbone_lr_scale: 0.1
+  weight_decay: 0.05
+  grad_clip: 1.0
+
+  scheduler: cosine
+  min_lr: 1.0e-6
+
+  grl_warmup_epochs: 20
+  grl_lambda_max: 0.1
+
+  use_amp: true
+
+  val_interval: 1          # validate every epoch (short run)
+  log_interval: 25
+
+  seed: 42
+
+losses:
+  temperature: 0.07
+  lambda_nce: 1.0
+  lambda_js: 0.5
+  lambda_domain: 0.1
+  lambda_rot: 0.2
+  lambda_unc: 0.1
+
+data:
+  train_datasets: [university1652]
+  val_datasets:   [university1652]
+  university1652_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/University-1652"
+  # Other roots kept for compatibility with mixed-dataset configs.
+  cvusa_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/CVUSA"
+  vigor_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/VIGOR"
+  cvact_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/CVACT"
+
+logging:
+  use_wandb: true
+  use_tensorboard: true
+  wandb_project: "hcvgloc-distributed"
+  wandb_entity: "w2c-lab"

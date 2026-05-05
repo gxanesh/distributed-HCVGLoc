@@ -38,6 +38,7 @@ from hcvgloc.losses.composite_loss import Stage1Loss
 from hcvgloc.datasets.cvusa import CVUSADataset, CVUSAGallery
 from hcvgloc.datasets.cvact import CVACTDataset, CVACTGallery
 from hcvgloc.datasets.vigor import VIGORDataset, VIGORGallery
+from hcvgloc.datasets.university1652 import University1652Dataset, University1652Gallery
 from hcvgloc.datasets.sampler import DomainBalancedDistributedSampler
 from hcvgloc.datasets.transforms import (
     query_train_transform, sat_train_transform, val_transform
@@ -117,6 +118,15 @@ def build_train_datasets(cfg: dict):
         datasets.append(ds)
         print_rank0(f"  [CVACT] train: {len(ds):,} pairs")
 
+    if "university1652" in data_cfg.get("train_datasets", []):
+        ds = University1652Dataset(
+            root=data_cfg["university1652_root"], split="train",
+            query_transform=q_tf, sat_transform=s_tf,
+        )
+        domain_ids.extend([3] * len(ds))
+        datasets.append(ds)
+        print_rank0(f"  [University-1652] train: {len(ds):,} pairs")
+
     combined = ConcatDataset(datasets)
     return combined, domain_ids
 
@@ -158,6 +168,18 @@ def build_val_loaders(cfg: dict):
         g_ds = VIGORGallery(root=data_cfg["vigor_root"], split="val", area="cross",
                             transform=v_tf)
         val_loaders["VIGOR-cross"] = {
+            "query":   DataLoader(q_ds, batch_size=val_bs, shuffle=False,
+                                  num_workers=nw, pin_memory=True),
+            "gallery": DataLoader(g_ds, batch_size=val_bs, shuffle=False,
+                                  num_workers=nw, pin_memory=True),
+        }
+
+    if "university1652" in data_cfg.get("val_datasets", []):
+        q_ds = University1652Dataset(root=data_cfg["university1652_root"], split="val",
+                                     query_transform=v_tf, sat_transform=v_tf)
+        g_ds = University1652Gallery(root=data_cfg["university1652_root"], split="val",
+                                     transform=v_tf)
+        val_loaders["University-1652"] = {
             "query":   DataLoader(q_ds, batch_size=val_bs, shuffle=False,
                                   num_workers=nw, pin_memory=True),
             "gallery": DataLoader(g_ds, batch_size=val_bs, shuffle=False,
@@ -257,15 +279,12 @@ def train_one_epoch(
     log_interval = cfg["training"].get("log_interval", 50)
 
     # Update GRL lambda for this epoch
-    grl_lambda = CoarseLocalizer.schedule_grl_lambda if hasattr(
-        CoarseLocalizer, "schedule_grl_lambda"
-    ) else None
-    lam = model.module.domain_head.DomainAdversarialModule.schedule_lambda(
+    from hcvgloc.models.stage1.domain_adversarial import DomainAdversarialModule
+    lam = DomainAdversarialModule.schedule_lambda(
         epoch,
         warmup_epochs=cfg["training"].get("grl_warmup_epochs", 20),
         lambda_max=cfg["training"].get("grl_lambda_max", 0.1),
-    ) if hasattr(model, "module") else 0.0
-
+    )
     raw_model = model.module if hasattr(model, "module") else model
     raw_model.set_grl_lambda(lam)
 
@@ -401,7 +420,7 @@ def main():
             model,
             device_ids=[local_rank],
             output_device=local_rank,
-            find_unused_parameters=False,   # set True if heads are sometimes skipped
+            find_unused_parameters=True,
         )
 
     total_params = sum(p.numel() for p in model.parameters()) / 1e6

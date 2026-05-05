@@ -56,9 +56,9 @@ data:
   val_datasets: [cvact, vigor]
 
   # Update these paths to match your workstation
-  cvusa_root: "/media/8TB-1/gs37r/research/datasets/CVUSA"
-  vigor_root: "/media/8TB-1/gs37r/research/datasets/VIGOR"
-  cvact_root: "/media/8TB-1/gs37r/research/datasets/CVACT"
+  cvusa_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/CVUSA"
+  vigor_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/VIGOR"
+  cvact_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/CVACT"
 
 logging:
   use_wandb: false

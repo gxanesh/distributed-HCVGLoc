@@ -1,6 +1,9 @@
-# stage1_ddp_2gpu.yaml
-exp_name: "stage1_ddp_2gpu"
-output_dir: "experiments/stage1_ddp_2gpu"
+# stage1_univ1652_baseline.yaml
+# Single-GPU baseline on University-1652 (for convergence-parity comparison vs 4-GPU DDP).
+# Identical hyperparameters to stage1_univ1652_4gpu.yaml for fair comparison.
+
+exp_name: "stage1_univ1652_1gpu_baseline"
+output_dir: "experiments/stage1_univ1652_baseline"
 
 model:
   descriptor_dim: 512
@@ -10,22 +13,28 @@ model:
   num_domains: 4
 
 training:
-  epochs: 100
-  batch_size: 32          # per-GPU → global batch = 32 × 2 = 64
+  epochs: 5
+  batch_size: 32
   val_batch_size: 128
   num_workers: 8
+
   optimizer: adamw
   lr: 3.0e-4
   backbone_lr_scale: 0.1
   weight_decay: 0.05
   grad_clip: 1.0
+
   scheduler: cosine
   min_lr: 1.0e-6
+
   grl_warmup_epochs: 20
   grl_lambda_max: 0.1
+
   use_amp: true
-  val_interval: 5
-  log_interval: 50
+
+  val_interval: 1
+  log_interval: 25
+
   seed: 42
 
 losses:
@@ -37,12 +46,15 @@ losses:
   lambda_unc: 0.1
 
 data:
-  train_datasets: [cvusa, vigor]
-  val_datasets: [cvact]
+  train_datasets: [university1652]
+  val_datasets:   [university1652]
+  university1652_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/University-1652"
   cvusa_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/CVUSA"
   vigor_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/VIGOR"
   cvact_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/CVACT"
 
 logging:
-  use_wandb: false
+  use_wandb: true
   use_tensorboard: true
+  wandb_project: "hcvgloc-distributed"
+  wandb_entity: "w2c-lab"

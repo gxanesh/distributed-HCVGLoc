@@ -105,9 +105,19 @@ class TrainingLogger:
         if use_wandb:
             try:
                 import wandb
-                wandb.init(project="hcvgloc-distributed", name=exp_name, config=config)
+                wb_cfg = (config or {}).get("logging", {}) if isinstance(config, dict) else {}
+                wandb.init(
+                    project=wb_cfg.get("wandb_project", "hcvgloc-distributed"),
+                    entity=wb_cfg.get("wandb_entity", None),
+                    group=wb_cfg.get("wandb_group", None),
+                    name=exp_name,
+                    config=config,
+                )
                 self._wandb = wandb
-                self.logger.info("WandB logging enabled.")
+                self.logger.info(
+                    f"WandB logging enabled → {wb_cfg.get('wandb_entity','?')}/"
+                    f"{wb_cfg.get('wandb_project','hcvgloc-distributed')}:{exp_name}"
+                )
             except ImportError:
                 self.logger.warning("WandB not installed; skipping.")
 

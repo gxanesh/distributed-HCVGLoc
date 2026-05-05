@@ -236,7 +236,50 @@ def parse_args():
     p.add_argument("--steps", type=int, default=30,
                    help="Number of profiling steps per batch size (warmup excluded)")
     p.add_argument("--output_dir", type=str, default="results")
+    p.add_argument("--wandb", action="store_true",
+                   help="Log run to wandb (rank 0 only).")
+    p.add_argument("--wandb_project", type=str, default="hcvgloc-distributed")
+    p.add_argument("--wandb_entity", type=str, default="w2c-lab")
+    p.add_argument("--wandb_group", type=str, default="comm_profiler")
     return p.parse_args()
+
+
+def _log_to_wandb(args, results, json_path: Path, plot_path: Path):
+    try:
+        import wandb
+    except ImportError:
+        print("[wandb] not installed; skipping wandb logging.")
+        return
+
+    world_size = results[0]["world_size"]
+    run_name = f"comm_profile_W{world_size}"
+    wandb.init(
+        project=args.wandb_project,
+        entity=args.wandb_entity,
+        group=args.wandb_group,
+        name=run_name,
+        config={
+            "world_size": world_size,
+            "batch_sizes": args.batch_sizes,
+            "steps": args.steps,
+        },
+        reinit=True,
+    )
+
+    # Per-batch-size metrics as a wandb Table, plus one step per batch size.
+    table = wandb.Table(columns=list(results[0].keys()))
+    for row in results:
+        table.add_data(*row.values())
+        wandb.log({f"comm/{k}": v for k, v in row.items()
+                   if k not in ("batch_size", "world_size")},
+                  step=row["batch_size"])
+
+    wandb.log({"comm_profile_table": table})
+    if plot_path.exists():
+        wandb.log({"comm_overhead_plot": wandb.Image(str(plot_path))})
+    wandb.save(str(json_path))
+    wandb.finish()
+    print(f"[wandb] comm profiler run synced ({run_name})")
 
 
 if __name__ == "__main__":
@@ -257,4 +300,9 @@ if __name__ == "__main__":
         print(f"\n[Saved] {json_path}")
 
         plot_results(results, out / "plots")
+        plot_path = out / "plots" / f"comm_overhead_W{world_size}.png"
+
+        if args.wandb:
+            _log_to_wandb(args, results, json_path, plot_path)
+
         print("\n[Communication profiling complete]")
