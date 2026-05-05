@@ -13,6 +13,7 @@ env/
 venv/
 CLAUDE.md
 .claude/
+progress_report_2026-04-21.md
 
 # Jupyter
 .ipynb_checkpoints/
@@ -24,9 +25,9 @@ CLAUDE.md
 checkpoints/
 wandb/
 
+
 # Data
 data/
-/datasets/
 docs/
 results/
 logs/
