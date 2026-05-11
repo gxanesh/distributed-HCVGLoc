@@ -1,0 +1,80 @@
+# stage1_univ1652_best_baseline_smoke.yaml
+# ------------------------------------------------------------------
+# Single-GPU baseline (5-epoch SMOKE) using the same settings as
+# stage1_univ1652_best_4gpu.yaml (memory bank, hard-neg mining,
+# symmetric InfoNCE, label smoothing, warmup_cosine LR).
+#
+# BATCH-SIZE NOTE: the 4-GPU best config uses batch_size=64 PER-GPU
+# (global=256). At 384x384 with this model and AMP, 64/GPU on a single
+# 48 GB Ada 6000 risks OOM. Set to 32/GPU here as the safe default;
+# bump to 64 once you confirm peak GPU mem leaves headroom.
+#
+# Launch (single-GPU, no torchrun):
+#   python tools/train_stage1.py --config configs/stage1_univ1652_best_baseline_smoke.yaml
+
+exp_name: "single-gpu-baseline-univ1652-smoke"
+output_dir: "experiments/single_gpu_baseline_univ1652_smoke"
+
+model:
+  descriptor_dim: 512
+  fpn_out_ch: 256
+  num_fpn_layers: 3
+  num_slots: 8
+  num_domains: 4
+
+training:
+  epochs: 5                # smoke test; bump to 20 for the full run
+  batch_size: 32           # per-GPU; conservative single-GPU value
+  val_batch_size: 128
+  num_workers: 8
+
+  optimizer: adamw
+  lr: 3.0e-4
+  backbone_lr_scale: 0.1
+  weight_decay: 0.01
+  grad_clip: 1.0
+
+  scheduler: warmup_cosine
+  warmup_epochs: 5
+  min_lr: 1.0e-6
+
+  grl_warmup_epochs: 20
+  grl_lambda_max: 0.1
+
+  use_amp: true
+
+  val_interval: 1          # validate every epoch (per requirement)
+  log_interval: 25
+
+  seed: 42
+
+losses:
+  temperature: 0.07
+  lambda_nce: 1.0
+  lambda_js: 0.0
+  lambda_domain: 0.1
+  lambda_rot: 0.2
+  lambda_unc: 0.1
+
+  use_memory_bank: true
+  memory_bank_size: 8192
+  infonce_symmetric: true
+  infonce_hard_negative_weight: 0.5
+  infonce_hard_negative_margin: 0.3
+  infonce_label_smoothing: 0.1
+  domain_label_smoothing: 0.1
+
+data:
+  train_datasets: [university1652]
+  val_datasets:   [university1652]
+  university1652_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/University-1652"
+  cvusa_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/CVUSA"
+  vigor_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/VIGOR"
+  cvact_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/CVACT"
+
+logging:
+  use_wandb: true
+  use_tensorboard: true
+  wandb_project: "hcvgloc-distributed"
+  wandb_entity: "w2c-lab"
+  wandb_tags: ["convergence-parity", "single-gpu", "smoke"]

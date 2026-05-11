@@ -21,7 +21,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from hcvgloc.losses.infonce import LabelAwareInfoNCE
+from hcvgloc.losses.infonce import LabelAwareInfoNCE, MemoryBankInfoNCE
 
 
 class JSDiv(nn.Module):
@@ -125,6 +125,17 @@ class Stage1Loss(nn.Module):
         lambda_domain: float = 0.1,
         lambda_rot: float = 0.2,
         lambda_unc: float = 0.1,
+        # Optional memory-bank / hard-negative-aware InfoNCE settings.
+        # Activated when use_memory_bank=True or hard_negative_weight>0.
+        use_memory_bank: bool = False,
+        memory_bank_size: int = 8192,
+        feature_dim: int = 512,
+        infonce_symmetric: bool = True,
+        infonce_hard_negative_weight: float = 0.0,
+        infonce_hard_negative_margin: float = 0.3,
+        infonce_label_smoothing: float = 0.0,
+        # Label smoothing for the domain-classifier cross-entropy.
+        domain_label_smoothing: float = 0.0,
     ):
         super().__init__()
         self.lambda_nce = lambda_nce
@@ -133,9 +144,23 @@ class Stage1Loss(nn.Module):
         self.lambda_rot = lambda_rot
         self.lambda_unc = lambda_unc
 
-        self.nce_loss = LabelAwareInfoNCE(temperature=temperature)
+        if use_memory_bank or infonce_hard_negative_weight > 0:
+            self.nce_loss = MemoryBankInfoNCE(
+                temperature=temperature,
+                symmetric=infonce_symmetric,
+                hard_negative_weight=infonce_hard_negative_weight,
+                hard_negative_margin=infonce_hard_negative_margin,
+                use_memory_bank=use_memory_bank,
+                feature_dim=feature_dim,
+                bank_size=memory_bank_size,
+                label_smoothing=infonce_label_smoothing,
+            )
+        else:
+            self.nce_loss = LabelAwareInfoNCE(temperature=temperature)
         self.js_loss = JSDiv()
-        self.domain_loss = nn.CrossEntropyLoss()
+        self.domain_loss = nn.CrossEntropyLoss(
+            label_smoothing=domain_label_smoothing
+        )
         self.rot_loss = RotationLoss()
         self.unc_loss = UncertaintyLoss()
 

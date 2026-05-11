@@ -111,6 +111,7 @@ class TrainingLogger:
                     entity=wb_cfg.get("wandb_entity", None),
                     group=wb_cfg.get("wandb_group", None),
                     name=exp_name,
+                    tags=wb_cfg.get("wandb_tags", None),
                     config=config,
                 )
                 self._wandb = wandb
@@ -154,6 +155,20 @@ class TrainingLogger:
     def warning(self, msg: str):
         if self.rank == 0:
             self.logger.warning(msg)
+
+    def set_summary(self, summary: Dict[str, Any]):
+        """
+        Write a final-state summary to wandb.run.summary (rank-0 only).
+        Used for end-of-training totals: total_wall_clock_sec, final_R@K,
+        peak_gpu_mem_MB, etc.
+        """
+        if self.rank != 0 or self._wandb is None:
+            return
+        run = self._wandb.run
+        if run is None:
+            return
+        for k, v in summary.items():
+            run.summary[k] = v
 
     def close(self):
         if self._tb:

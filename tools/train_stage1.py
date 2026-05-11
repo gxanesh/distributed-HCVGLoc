@@ -190,6 +190,54 @@ def build_val_loaders(cfg: dict):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Scheduler builder
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _build_scheduler(optimizer, train_cfg: dict):
+    """
+    Returns the per-epoch LR scheduler.
+
+    Supported names (training.scheduler):
+        'cosine'         : torch CosineAnnealingLR over `epochs`
+        'warmup_cosine'  : LinearLR warmup over `warmup_epochs`, then
+                           CosineAnnealingLR over the remaining epochs.
+                           Wired via SequentialLR with milestone at warmup_epochs.
+    """
+    name = train_cfg.get("scheduler", "cosine")
+    epochs = train_cfg.get("epochs", 100)
+    eta_min = train_cfg.get("min_lr", 1e-6)
+
+    if name == "cosine":
+        return torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=epochs, eta_min=eta_min
+        )
+
+    if name == "warmup_cosine":
+        warmup_epochs = max(1, int(train_cfg.get("warmup_epochs", 5)))
+        # start_factor near 0 means lr ≈ 0 at epoch 0 and reaches base_lr at
+        # the warmup boundary. Avoid exactly 0.0 to keep AdamW's first step
+        # numerically stable on AMP.
+        warmup = torch.optim.lr_scheduler.LinearLR(
+            optimizer,
+            start_factor=1e-3,
+            end_factor=1.0,
+            total_iters=warmup_epochs,
+        )
+        cosine = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=max(1, epochs - warmup_epochs),
+            eta_min=eta_min,
+        )
+        return torch.optim.lr_scheduler.SequentialLR(
+            optimizer,
+            schedulers=[warmup, cosine],
+            milestones=[warmup_epochs],
+        )
+
+    raise ValueError(f"Unknown scheduler '{name}'. Use 'cosine' or 'warmup_cosine'.")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Checkpoint helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -435,7 +483,15 @@ def main():
         lambda_domain=loss_cfg.get("lambda_domain", 0.1),
         lambda_rot=loss_cfg.get("lambda_rot", 0.2),
         lambda_unc=loss_cfg.get("lambda_unc", 0.1),
-    )
+        use_memory_bank=loss_cfg.get("use_memory_bank", False),
+        memory_bank_size=loss_cfg.get("memory_bank_size", 8192),
+        feature_dim=model_cfg.get("descriptor_dim", 512),
+        infonce_symmetric=loss_cfg.get("infonce_symmetric", True),
+        infonce_hard_negative_weight=loss_cfg.get("infonce_hard_negative_weight", 0.0),
+        infonce_hard_negative_margin=loss_cfg.get("infonce_hard_negative_margin", 0.3),
+        infonce_label_smoothing=loss_cfg.get("infonce_label_smoothing", 0.0),
+        domain_label_smoothing=loss_cfg.get("domain_label_smoothing", 0.0),
+    ).to(device)
 
     # ── Optimizer & scheduler ─────────────────────────────────────────────────
     train_cfg = cfg["training"]
@@ -448,11 +504,7 @@ def main():
         param_groups,
         weight_decay=train_cfg.get("weight_decay", 0.05),
     )
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer,
-        T_max=train_cfg.get("epochs", 100),
-        eta_min=train_cfg.get("min_lr", 1e-6),
-    )
+    scheduler = _build_scheduler(optimizer, train_cfg)
     scaler = GradScaler() if train_cfg.get("use_amp", True) else None
 
     # ── Resume ────────────────────────────────────────────────────────────────
@@ -498,9 +550,19 @@ def main():
     timer = CUDATimer()
     print_rank0(f"\nStarting training: epochs {start_epoch} → {train_cfg['epochs']}\n")
 
+    # Wall-clock + peak-GPU-memory tracking for the run summary.
+    run_start_time = time.time()
+    peak_gpu_mem_mb_run = 0.0
+    last_r1 = 0.0
+    last_r5 = 0.0
+    last_r10 = 0.0
+    epoch_to_R1_gt_50 = -1
+    R1_THRESHOLD = 0.50  # config-able later if needed
+
     for epoch in range(start_epoch, train_cfg["epochs"]):
         sampler.set_epoch(epoch)   # critical for correct DDP shuffling
 
+        torch.cuda.reset_peak_memory_stats(device)
         t0 = time.time()
         train_metrics = train_one_epoch(
             model, train_loader, criterion, optimizer,
@@ -508,6 +570,8 @@ def main():
             epoch, cfg, logger, timer,
         )
         epoch_time = time.time() - t0
+        peak_gpu_mem_mb_epoch = torch.cuda.max_memory_allocated(device) / (1024 ** 2)
+        peak_gpu_mem_mb_run = max(peak_gpu_mem_mb_run, peak_gpu_mem_mb_epoch)
         scheduler.step()
 
         # Validation (every val_interval epochs, or last epoch)
@@ -536,22 +600,52 @@ def main():
             )
 
             # Epoch-level logging
+            cumulative_sec = time.time() - run_start_time
+            gpu_mem_alloc_mb = torch.cuda.memory_allocated(device) / (1024 ** 2)
             log_data = {
                 **{f"train_{k}": v for k, v in train_metrics.items()},
+                "epoch_wall_clock_sec": epoch_time,
+                "epoch_time_sec": epoch_time,        # back-compat alias
                 "epoch_time_min": epoch_time / 60,
+                "cumulative_wall_clock_sec": cumulative_sec,
+                "gpu_mem_allocated_MB": gpu_mem_alloc_mb,
+                "peak_gpu_mem_MB": peak_gpu_mem_mb_epoch,
                 "lr": scheduler.get_last_lr()[0],
                 "grl_lambda": (model.module if hasattr(model, "module") else model).get_grl_lambda(),
             }
             for ds_name, scores in val_results.items():
                 for metric, val in scores.items():
                     log_data[f"val/{ds_name}/{metric}"] = val
+                    if metric == "R@1":
+                        last_r1 = val
+                        if epoch_to_R1_gt_50 < 0 and val > R1_THRESHOLD:
+                            epoch_to_R1_gt_50 = epoch
+                    elif metric == "R@5":
+                        last_r5 = val
+                    elif metric == "R@10":
+                        last_r10 = val
 
             logger.log_epoch(epoch, log_data)
 
+    total_wall_clock_sec = time.time() - run_start_time
     print_rank0(f"\n{'='*60}")
     print_rank0(f"  Training complete.  Best R@1 = {best_r1*100:.2f}%")
+    print_rank0(f"  Total wall-clock = {total_wall_clock_sec:.1f}s "
+                f"({total_wall_clock_sec/60:.2f} min)")
+    print_rank0(f"  Peak GPU memory  = {peak_gpu_mem_mb_run:.1f} MB")
     print_rank0(f"  Checkpoints saved to: {output_dir}/checkpoints/")
     print_rank0(f"{'='*60}\n")
+
+    # Wandb run.summary — final scalars
+    logger.set_summary({
+        "total_wall_clock_sec": round(total_wall_clock_sec, 2),
+        "final_R@1":  last_r1,
+        "final_R@5":  last_r5,
+        "final_R@10": last_r10,
+        "best_R@1":   best_r1,
+        "epoch_to_R1_gt_50": epoch_to_R1_gt_50,
+        "peak_gpu_mem_MB": round(peak_gpu_mem_mb_run, 2),
+    })
 
     logger.close()
     teardown_distributed()

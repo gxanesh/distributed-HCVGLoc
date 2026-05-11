@@ -1,0 +1,112 @@
+# stage1_univ1652_best_4gpu.yaml
+# ------------------------------------------------------------------
+# Translation of the upstream avgl_plus_plus config that produced the
+# best stage-1 result on University-1652 (wandb run started 2026-03-27,
+# repo gxanesh/avgl_plus_plus @ f261fae). Adapted to distributed-HCVGLoc's
+# flatter YAML schema for use with tools/train_stage1.py.
+#
+# CARRIES OVER directly:
+#   - 50 epochs, AdamW, lr 3e-4, weight_decay 0.01, backbone_lr_scale 0.1
+#   - Cosine LR with min_lr 1e-6 (T_max = epochs = 50, no LR-collapse issue
+#     like the 5-epoch progress-report run had)
+#   - InfoNCE τ=0.07, retrieval weight 1.0, rotation 0.2, uncertainty 0.1,
+#     domain 0.1, JS disabled (enable_js: false → lambda_js: 0.0)
+#   - GRL λ schedule: 0 → 0.1 over 20 epochs
+#   - AMP, descriptor_dim 512, num_slots 8, num_domains 4
+#   - University-1652 only (CVUSA / VIGOR disabled in source)
+#
+# NEWLY PORTED (now usable here):
+#   - InfoNCE memory bank (use_memory_bank, memory_bank_size)
+#   - Hard-negative mining (infonce_hard_negative_{weight,margin})
+#   - Symmetric InfoNCE (infonce_symmetric)
+#   - InfoNCE label smoothing (infonce_label_smoothing)
+#   - Domain-classifier label smoothing (domain_label_smoothing)
+#   - warmup_cosine scheduler (training.scheduler=warmup_cosine + warmup_epochs)
+#   See hcvgloc/losses/infonce.py::MemoryBankInfoNCE and
+#   tools/train_stage1.py::_build_scheduler.
+#
+# STILL NOT carried over (open follow-ups):
+#   - rotation_aug=true at the dataloader level (no toggle in this trainer)
+#   - save_interval=5 (trainer hard-codes save every 10 epochs)
+#
+# SCHEMA NOTE: in distributed-HCVGLoc, training.batch_size is PER-GPU.
+# The source dump shows batch_size=64; if that was global in avgl_plus_plus,
+# the equivalent here is 16/GPU on 4 ranks. Setting 64/GPU below produces
+# global batch 256 — verify it fits on the Ada 6000s before launching.
+# Drop to 32/GPU (matches our progress-report run that did fit) if OOM.
+
+exp_name: "stage1_univ1652_best_4gpu"
+output_dir: "experiments/stage1_univ1652_best_4gpu"
+
+model:
+  descriptor_dim: 512
+  fpn_out_ch: 256
+  num_fpn_layers: 3
+  num_slots: 8
+  num_domains: 4
+
+training:
+  epochs: 50
+
+  batch_size: 64           # per-GPU (see schema note above); global = 64 × 4 = 256
+  val_batch_size: 128
+  num_workers: 8
+
+  optimizer: adamw
+  lr: 3.0e-4
+  backbone_lr_scale: 0.1
+  weight_decay: 0.01       # was 0.05 in earlier dist-HCVGLoc configs
+  grad_clip: 1.0
+
+  scheduler: warmup_cosine # 5-epoch linear warmup then cosine to min_lr
+  warmup_epochs: 5         # used only when scheduler=warmup_cosine
+  min_lr: 1.0e-6
+
+  grl_warmup_epochs: 20    # matches source lambda_schedule_epochs
+  grl_lambda_max: 0.1      # matches source lambda_target
+
+  use_amp: true
+
+  val_interval: 1          # validate every epoch (matches source)
+  log_interval: 50
+
+  seed: 42
+
+losses:
+  temperature: 0.07
+  lambda_nce: 1.0          # source: training.loss.weights.retrieval
+  lambda_js: 0.0           # source has enable_js: false → disabled here too
+  lambda_domain: 0.1
+  lambda_rot: 0.2
+  lambda_unc: 0.1
+
+  # MemoryBankInfoNCE settings (ported from avgl_plus_plus). Activating any
+  # of use_memory_bank=true OR infonce_hard_negative_weight>0 swaps the
+  # default LabelAwareInfoNCE for MemoryBankInfoNCE inside Stage1Loss.
+  use_memory_bank: true
+  memory_bank_size: 8192
+  infonce_symmetric: true
+  infonce_hard_negative_weight: 0.5
+  infonce_hard_negative_margin: 0.3
+  infonce_label_smoothing: 0.1
+
+  # Label smoothing applied to the domain-classifier cross-entropy.
+  # Source: training.loss.domain.label_smoothing in avgl config.
+  domain_label_smoothing: 0.1
+
+data:
+  train_datasets: [university1652]
+  val_datasets:   [university1652]
+  university1652_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/University-1652"
+  cvusa_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/CVUSA"
+  vigor_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/VIGOR"
+  cvact_root: "/media/8TB-1/gs37r/research/uav-loc/all-datasets/CVACT"
+
+logging:
+  use_wandb: true
+  use_tensorboard: true
+  wandb_project: "avgl_stage1"   # mirrors the source run's project name;
+                                 # change to "hcvgloc-distributed" if you
+                                 # want this run grouped with the
+                                 # distributed-systems benchmarks instead
+  wandb_entity: "w2c-lab"
