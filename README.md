@@ -12,6 +12,8 @@ This repository implements and rigorously evaluates the **distributed PyTorch DD
 pipeline** for Coarse Retrieval Stage of the HCVGLoc framework -- a
 hierarchical cross-view geo-localization system for GPS-denied UAV navigation.
 
+📄 **[Read project details](SP_2026_CS_6800_distributed-HCVGL.pdf)** — full project report (PDF)
+
 ![Simple DDP Architecture](simple-DDP-architecture.png)
 
 The project treats the 4× NVIDIA RTX Ada 6000 training cluster as a distributed system:
