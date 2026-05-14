@@ -1,0 +1,38 @@
+[
+  {
+    "batch_size": 16,
+    "world_size": 2,
+    "avg_compute_ms": 4.679,
+    "avg_allreduce_ms": 0.638,
+    "c2c_ratio": 7.329,
+    "comm_overhead_pct": 12.01,
+    "throughput_img_s": 6018.3
+  },
+  {
+    "batch_size": 32,
+    "world_size": 2,
+    "avg_compute_ms": 9.955,
+    "avg_allreduce_ms": 0.62,
+    "c2c_ratio": 16.057,
+    "comm_overhead_pct": 5.86,
+    "throughput_img_s": 6052.1
+  },
+  {
+    "batch_size": 64,
+    "world_size": 2,
+    "avg_compute_ms": 21.922,
+    "avg_allreduce_ms": 0.78,
+    "c2c_ratio": 28.102,
+    "comm_overhead_pct": 3.44,
+    "throughput_img_s": 5638.4
+  },
+  {
+    "batch_size": 128,
+    "world_size": 2,
+    "avg_compute_ms": 26.499,
+    "avg_allreduce_ms": 1.652,
+    "c2c_ratio": 16.041,
+    "comm_overhead_pct": 5.87,
+    "throughput_img_s": 9093.9
+  }
+]

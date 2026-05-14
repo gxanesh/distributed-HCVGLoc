@@ -29,7 +29,6 @@ wandb/
 # Data
 data/
 docs/
-results/
 logs/
 
 # IDE

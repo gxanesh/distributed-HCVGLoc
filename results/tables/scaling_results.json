@@ -1,0 +1,38 @@
+[
+  {
+    "num_gpus": 1,
+    "batch_size_per_gpu": 32,
+    "global_batch_size": 32,
+    "total_steps": 600,
+    "wall_time_sec": 4.223,
+    "samples_per_sec": 4546.6,
+    "epochs": 3,
+    "ideal_speedup": 1.0,
+    "actual_speedup": 1.0,
+    "parallel_eff_pct": 100.0
+  },
+  {
+    "num_gpus": 2,
+    "batch_size_per_gpu": 32,
+    "global_batch_size": 64,
+    "total_steps": 600,
+    "wall_time_sec": 5.888,
+    "samples_per_sec": 6521.46,
+    "epochs": 3,
+    "ideal_speedup": 2.0,
+    "actual_speedup": 1.434359741345181,
+    "parallel_eff_pct": 71.71798706725905
+  },
+  {
+    "num_gpus": 4,
+    "batch_size_per_gpu": 32,
+    "global_batch_size": 128,
+    "total_steps": 600,
+    "wall_time_sec": 11.74,
+    "samples_per_sec": 6541.71,
+    "epochs": 3,
+    "ideal_speedup": 4.0,
+    "actual_speedup": 1.4388136189680198,
+    "parallel_eff_pct": 35.9703404742005
+  }
+]

@@ -1,0 +1,52 @@
+[
+  {
+    "interval_epochs": 1,
+    "n_checkpoints": 100,
+    "ckpt_size_mb": 20.77,
+    "avg_save_time_ms": 87.62,
+    "avg_load_time_ms": 43.31,
+    "steps_lost_on_failure": 0.5,
+    "total_save_overhead_ms": 8762.5,
+    "overhead_pct_estimate": 3.5
+  },
+  {
+    "interval_epochs": 5,
+    "n_checkpoints": 20,
+    "ckpt_size_mb": 20.77,
+    "avg_save_time_ms": 84.0,
+    "avg_load_time_ms": 50.28,
+    "steps_lost_on_failure": 2.5,
+    "total_save_overhead_ms": 1680.03,
+    "overhead_pct_estimate": 0.67
+  },
+  {
+    "interval_epochs": 10,
+    "n_checkpoints": 10,
+    "ckpt_size_mb": 20.77,
+    "avg_save_time_ms": 89.87,
+    "avg_load_time_ms": 49.45,
+    "steps_lost_on_failure": 5.0,
+    "total_save_overhead_ms": 898.68,
+    "overhead_pct_estimate": 0.36
+  },
+  {
+    "interval_epochs": 20,
+    "n_checkpoints": 5,
+    "ckpt_size_mb": 20.77,
+    "avg_save_time_ms": 91.34,
+    "avg_load_time_ms": 46.6,
+    "steps_lost_on_failure": 10.0,
+    "total_save_overhead_ms": 456.68,
+    "overhead_pct_estimate": 0.18
+  },
+  {
+    "interval_epochs": 50,
+    "n_checkpoints": 2,
+    "ckpt_size_mb": 20.77,
+    "avg_save_time_ms": 88.3,
+    "avg_load_time_ms": 46.14,
+    "steps_lost_on_failure": 25.0,
+    "total_save_overhead_ms": 176.59,
+    "overhead_pct_estimate": 0.07
+  }
+]
